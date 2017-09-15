@@ -26,7 +26,7 @@ class SharedSpreadsheets(Spreadsheets):
         def row(self, key, range):
             return SharedSpreadsheets.Sheet.Row(key, range, self)
 
-    def __init__(self, gapi, name, datasheet="Datos", blocksheet="__Block__"):
+    def __init__(self, gapi, name, *, datasheet="Datos", blocksheet="__Block__"):
         Spreadsheets.__init__(self, gapi, name)
         self._datasheet = self[datasheet]
         self._headers = self.datasheet[0]
@@ -46,7 +46,7 @@ class SharedSpreadsheets(Spreadsheets):
             except IndexError:
                 pass
         else:
-            range = self._blocksheet.append_row("A1", [self.api.uuid, self.datasheet.sheet_name])
+            range = self._blocksheet.append_row([self.api.uuid, self.datasheet.sheet_name]).range
             init, fin = range.split(":")
             self._function = NEXT_FUNCTION.format(b=fin, a=init,
                                                   cols_numbers="{cols_numbers}",
@@ -59,7 +59,6 @@ class SharedSpreadsheets(Spreadsheets):
         self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=[],
                                                                 filters=[],
                                                                 initial=-1)
-
     @property
     def datasheet(self):
         return self._datasheet
@@ -113,14 +112,16 @@ class SharedSpreadsheets(Spreadsheets):
 
 
 class TranscomAPI(GoogleAPI):
-    def __init__(self, scopes, secret_file=None, secret_data=None, password=None):
+    def __init__(self, *, scopes, secret_file=None, secret_data=None, password=None):
         GoogleAPI.__init__(self, scopes=scopes, secret_file=secret_file, secret_data=secret_data, password=password)
 
-    def spreadsheet_open_shared(self, name=None, **kwargs):
+    def spreadsheet_open_shared(self, name=None, args=None, **kwargs):
         if name is None and "name" in kwargs:
             name = kwargs["name"]
         elif name is None:
             raise FileNotFoundError()
-        return self._files_open(SHEETS, SharedSpreadsheets, name, self.spreadsheets)
+        if args is None:
+            args = list()
+        return self._files_open(SHEETS, SharedSpreadsheets, name, self.spreadsheets, args=args, kwargs=kwargs)
 
 #TODO: More Friendly
