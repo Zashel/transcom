@@ -1,7 +1,9 @@
 import time
 from zashel.gapi import GoogleAPI, SHEETS, Spreadsheets
 
+
 NEXT_FUNCTION = """=getNext({b};{cols_numbers};{filters};{a};{initial})""" #B First, A Next
+
 
 class SharedSpreadsheets(Spreadsheets):
     """Only to use with an specific format"""
