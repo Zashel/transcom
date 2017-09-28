@@ -81,14 +81,16 @@ class SharedSpreadsheets(Spreadsheets):
     def my_row(self):
         return self._my_row
 
-    def get_next(self, columns, filter):
+    def get_next(self, columns, filter, *, first=None):
         columns = [str(column) for column in columns]
         columns = "{"+";".join(columns)+"}"
         filter = ["\""+f+"\"" for f in filter]
         filter = "{" + ";".join(filter) + "}"
+        if first is None:
+            first = self.blocked_row
         self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=columns,
                                                                 filters=filter,
-                                                                initial=self._blocked_row)
+                                                                initial=first)
         while True:
             blocked = self.blocksheet[self._my_row][2]
             if blocked == "EOF":
@@ -102,7 +104,7 @@ class SharedSpreadsheets(Spreadsheets):
             elif blocked == "#ERROR!":
                 self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=columns,
                                                                         filters=filter,
-                                                                        initial=self._blocked_row)
+                                                                        initial=first)
             else:
                 self._blocked_row = int(blocked)
                 return SharedSpreadsheets.Sheet.Row(self._blocked_row-1,
