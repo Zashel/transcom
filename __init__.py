@@ -30,9 +30,9 @@ class SharedSpreadsheets(Spreadsheets):
 
     def __init__(self, gapi, name, *, datasheet="Datos", blocksheet="__Block__"):
         Spreadsheets.__init__(self, gapi, name)
-        self._datasheet = self[datasheet]
-        self._headers = self.datasheet[0]
-        self._blocksheet = self[blocksheet]
+        self._datasheet = datasheet
+        self._headers = list(self.datasheet[0])
+        self._blocksheet = blocksheet
         self._my_row = None
         self._function = None
         for index, item in enumerate(self.blocksheet):
@@ -40,7 +40,7 @@ class SharedSpreadsheets(Spreadsheets):
             try:
                 if item[0] == self.api.uuid:
                     self._my_row = index
-                    self._function = NEXT_FUNCTION.format(b="B" + str(index + 1), a="A" + str(index + 1),
+                    self._function = NEXT_FUNCTION.format(b="B" + str(index+1), a="A" + str(index+1),
                                                           cols_numbers="{cols_numbers}",
                                                           filters="{filters}",
                                                           initial="{initial}")
@@ -48,26 +48,26 @@ class SharedSpreadsheets(Spreadsheets):
             except IndexError:
                 pass
         else:
-            range = self._blocksheet.append_row([self.api.uuid, self.datasheet.sheet_name]).range
+            range = self._blocksheet.append_row([self.api.uuid, self.datasheet.sheet_name])
             init, fin = range.split(":")
             self._function = NEXT_FUNCTION.format(b=fin, a=init,
                                                   cols_numbers="{cols_numbers}",
                                                   filters="{filters}",
                                                   initial="{initial}")
-            self._my_row = int(fin.strip("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-        self._blocked_row = 1
+            self._my_row = int(fin.strip("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))-1
+        self._blocked_row = 0
 
     def __del__(self):
-        self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=[],
-                                                                filters=[],
+        self.blocksheet[self._my_row][2] = self.function.format(cols_numbers="{}",
+                                                                filters="{}",
                                                                 initial=-1)
     @property
     def datasheet(self):
-        return self._datasheet
+        return self[self._datasheet]
 
     @property
     def blocksheet(self):
-        return self._blocksheet
+        return self[self._blocksheet]
 
     @property
     def function(self):
@@ -86,25 +86,36 @@ class SharedSpreadsheets(Spreadsheets):
         columns = "{"+";".join(columns)+"}"
         filter = ["\""+f+"\"" for f in filter]
         filter = "{" + ";".join(filter) + "}"
-        if first is None:
-            first = self.blocked_row
+        print("Filter: ", filter)
+        if first is not None:
+            data = list(self.datasheet)
+            for index, item in enumerate(data):
+                print("'"+str(item[0])+"'","'"+str(first)+"'")
+                if str(item[0]) == str(first):
+                    first = index
+                    print("First: ", first)
+                    break
+        if not first:
+            first = self._blocked_row
         self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=columns,
                                                                 filters=filter,
                                                                 initial=first)
+        time.sleep(2)
         while True:
-            blocked = self.blocksheet[self._my_row][2]
+            blocked = str(self.blocksheet[self._my_row][2])
             if blocked == "EOF":
                 self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=columns,
                                                                         filters=filter,
                                                                         initial=-1)
-                self._blocked_row = 1
+                self._blocked_row = 0
                 raise EOFError()
             elif blocked in ("Loading...", "Cargando..."):
                 time.sleep(2)
-            elif blocked == "#ERROR!":
+            elif blocked in ("#ERROR!", "#REF!"):
                 self.blocksheet[self._my_row][2] = self.function.format(cols_numbers=columns,
                                                                         filters=filter,
                                                                         initial=first)
+                time.sleep(1)
             else:
                 self._blocked_row = int(blocked)
                 return SharedSpreadsheets.Sheet.Row(self._blocked_row-1,
@@ -116,8 +127,9 @@ class SharedSpreadsheets(Spreadsheets):
 
 
 class TranscomAPI(GoogleAPI):
-    def __init__(self, *, scopes, secret_file=None, secret_data=None, password=None):
-        GoogleAPI.__init__(self, scopes=scopes, secret_file=secret_file, secret_data=secret_data, password=password)
+    def __init__(self, *, scopes, secret_file=None, secret_data=None, password=None, debug=False):
+        GoogleAPI.__init__(self, scopes=scopes, secret_file=secret_file, secret_data=secret_data, password=password,
+                           debug=debug)
 
     def spreadsheet_open_shared(self, name=None, args=None, **kwargs):
         if name is None and "name" in kwargs:
